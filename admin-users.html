@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Directory | Data4Ghana Admin</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/master-dashboard.css">
+    
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <script src="js/supabase.js"></script>
+    
+    <meta name="theme-color" content="#020817">
+</head>
+<body>
+    
+    <div id="admin-sidebar-container"></div>
+    
+    <main class="master-main">
+        <header class="top-nav" style="position: relative;">
+            <div style="display:flex; align-items:center; gap:16px; z-index: 2; position: relative;">
+                <button class="admin-menu-btn" onclick="toggleAdminMenu()">☰</button>
+            </div>
+            
+            <div class="page-title-group" style="position: absolute; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 1;">
+                <h1 id="pageTitle" style="pointer-events: auto;">User Directory</h1>
+            </div>
+            
+            <div class="admin-profile" style="z-index: 2; position: relative;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path></svg>
+                <span style="opacity:0.6; font-size:12px; margin-left:8px;">Administrator</span>
+            </div>
+        </header>
+
+        <div id="tab-users" class="tab-content active">
+            <div class="minimal-header" style="text-align: center; margin-bottom:24px;">
+                <p>Manage roles, wallets, and access.</p>
+            </div>
+
+            <!-- Search Bar -->
+            <div style="background:var(--bg-dark); border:1px solid var(--glass-border); border-radius:12px; padding:16px 24px; margin-bottom:24px; display:flex; gap:12px; align-items:center;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted); flex-shrink:0;"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
+                <input type="text" id="userSearchInput" oninput="filterUsersTable()" placeholder="Search by email or name..." style="flex:1; background:transparent; border:none; color:white; outline:none; font-size:14px;">
+                <button onclick="document.getElementById('userSearchInput').value=''; filterUsersTable();" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:18px; padding:0 4px;">×</button>
+            </div>
+
+            <style>
+                .premium-user-list { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; border-bottom: 1px solid transparent; }
+                .user-card-premium {
+                    display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr; align-items: center; gap: 16px;
+                    background: var(--bg-darker); border: 1px solid var(--glass-border); 
+                    border-radius: 16px; padding: 20px 24px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+                }
+                .user-card-premium:hover {
+                    transform: translateY(-2px); box-shadow: 0 12px 20px -3px rgba(0,0,0,0.05); border-color: #cbd5e1;
+                }
+                .uc-label { display: none; }
+                .uc-identity { display: flex; align-items: center; gap: 16px; }
+                .uc-avatar { 
+                    width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+                    font-size: 16px; font-weight: 800; color: white; background: linear-gradient(135deg, #3b82f6, #2563eb);
+                    box-shadow: 0 4px 10px rgba(37,99,235,0.2); flex-shrink: 0;
+                }
+                .uc-info h4 { margin: 0; font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px; line-height: 1.2; }
+                .uc-info .uc-email { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-top: 4px; margin-bottom: 8px; }
+                .uc-tags { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+                
+                .uc-treasury .uc-balance { font-size: 18px; font-weight: 800; color: var(--text-main); letter-spacing: -0.5px; }
+                .uc-treasury .uc-owed { font-size: 12px; font-weight: 800; color: #d97706; margin-top: 4px; }
+                
+                .uc-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+                
+                @media (max-width: 900px) {
+                    .premium-user-list { gap: 16px; }
+                    .user-card-premium { grid-template-columns: 1fr; gap: 16px; padding: 16px; }
+                    .uc-label { display: block; font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 800; margin-bottom: 6px; letter-spacing: 1px; }
+                    .uc-treasury, .uc-api, .uc-actions { padding-top: 16px; border-top: 1px dashed var(--glass-border); }
+                    .uc-actions { justify-content: stretch; display: grid; grid-template-columns: 1fr 1fr; }
+                    .uc-actions .btn-action { margin: 0 !important; width: 100%; justify-content: center; padding: 10px; }
+                }
+            </style>
+
+            <div class="premium-user-list" id="usersTableBody">
+                <!-- Injected by JS -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Wallet Control Modal (shared code needed here or injected) -->
+    <!-- For now, I'll include the modal HTML directly as it was in master-dashboard.html -->
+    <!-- I need to find the wallet control modal in the original file -->
+
+    <script src="js/admin-core.js"></script>
+    <script src="js/admin-menu.js"></script>
+    <script src="js/admin-modals.js"></script>
+    <script src="js/admin-users.js"></script>
+</body>
+</html>

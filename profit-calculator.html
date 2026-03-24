@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Profit Matrix | Data4Ghana</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/master-dashboard.css">
+    <link rel="stylesheet" href="css/profit-calculator.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <script src="js/supabase.js"></script>
+    <!-- Chart.js for bar chart visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="calculator-container">
+        <div class="calc-header" style="position: relative; padding-bottom: 24px;">
+            <div style="display:flex; align-items:center; gap:16px; z-index: 2; position: relative;">
+                <a href="master-dashboard.html" class="back-btn" style="margin:0;">← Back</a>
+            </div>
+            
+            <div class="page-title-group" style="position: absolute; left: 0; right: 0; top: 12px; text-align: center; pointer-events: none; z-index: 1;">
+                <h1 id="pageTitle" style="pointer-events: auto; margin:0; font-size: 24px; font-weight: 800;">Profit Matrix</h1>
+                <p style="margin: 4px 0 0; color: var(--text-muted); font-size: 13px;">Analyze network margins and profitability.</p>
+            </div>
+            
+            <div class="admin-profile" style="z-index: 2; position: relative; text-align: right;">
+                <span class="status-live" style="background:rgba(16,185,129,0.1); color:#10b981; padding:4px 12px; border-radius:12px; font-size:11px; font-weight:700;">LIVE ANALYSIS</span>
+            </div>
+        </div>
+
+        <!-- Network Selector Tabs -->
+        <div class="network-tabs" id="networkTabs">
+            <button class="net-tab" onclick="selectNetwork('data_mtn')" id="tab_data_mtn">
+                <span class="net-icon">🟡</span> MTN
+            </button>
+            <button class="net-tab" onclick="selectNetwork('data_tigo')" id="tab_data_tigo">
+                <span class="net-icon">📶</span> AT/Ishare
+            </button>
+            <button class="net-tab" onclick="selectNetwork('data_telecel')" id="tab_data_telecel">
+                <span class="net-icon">🔴</span> Telecel
+            </button>
+            <button class="net-tab" onclick="selectNetwork('data_bigtime')" id="tab_data_bigtime">
+                <span class="net-icon">⚡</span> AT Bigtime
+            </button>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state">
+            <div class="empty-icon">📊</div>
+            <h2>Select a Network Above</h2>
+            <p>Choose a network to load its data bundles and start entering your API costs.</p>
+        </div>
+
+        <!-- Data Table Panel (hidden until network selected) -->
+        <div id="profitTableWrapper" style="display:none;">
+            <div class="calc-panel" style="padding:0; overflow:hidden; margin-bottom:20px;">
+                <div style="padding:24px; display:flex; flex-direction:column; align-items:center; gap:20px; border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <h3 id="netHeading" style="margin:0; font-size:15px; text-transform:uppercase; letter-spacing:1px; color:#94a3b8;">Bundles</h3>
+                    <div style="display:flex; gap:10px;">
+                        <button class="action-btn add-btn" onclick="addCustomRow()">+ Add Bundle</button>
+                        <button class="action-btn run-btn" onclick="runAnalysis()">📊 Run Analysis</button>
+                    </div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="data-table" style="margin:0; width:100%;">
+                        <thead>
+                            <tr>
+                                <th>Bundle</th>
+                                <th>Plan</th>
+                                <th>API Cost (₵)</th>
+                                <th>Client<br><small>Sell Price</small></th>
+                                <th>VIP<br><small>Sell Price</small></th>
+                                <th>Elite<br><small>Sell Price</small></th>
+                                <th>Super Agent<br><small>Sell Price</small></th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="profitTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ANALYSIS RESULTS (hidden until user clicks Run Analysis) -->
+        <div id="analysisPanel" style="display:none;">
+            <div class="calc-panel analysis-panel">
+                <h3 style="margin-top:0; font-size:15px; text-transform:uppercase; letter-spacing:2px; margin-bottom:20px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:14px; text-align:center; color:#10b981;">
+                    📊 Profitability Analysis
+                </h3>
+
+                <!-- Best margin -->
+                <div id="analysisBestRow"></div>
+
+                <!-- Analysis summary cards-->
+                <div class="analysis-grid" id="analysisGrid"></div>
+
+                <!-- Grand Total -->
+                <div id="grandTotalCard" style="display:none; margin-top:16px;"></div>
+
+                <!-- Charts -->
+                <h4 style="margin:24px 0 12px; font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; text-align:center;">Profit Chart — Net Profit per Bundle by Tier</h4>
+                <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:24px; margin-bottom:24px;">
+                    <canvas id="profitChart" height="280"></canvas>
+                </div>
+
+                <!-- Detailed breakdown table -->
+                <h4 style="margin:24px 0 12px; font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; text-align:center;">Full Breakdown</h4>
+                <div style="overflow-x:auto;">
+                    <table class="data-table" id="analysisTable" style="margin:0; width:100%;"></table>
+                </div>
+            </div>
+        </div>
+
+        <!-- REFERENCE TABLE -->
+        <div class="calc-panel" style="margin-top:40px; padding:32px; background:rgba(0,0,0,0.15);">
+            <h3 style="margin-top:0; font-size:15px; text-transform:uppercase; letter-spacing:2px; margin-bottom:20px; text-align:center; color:var(--text-muted);">
+                📋 Reference Base Costs & Target Margins
+            </h3>
+            <div style="overflow-x:auto;">
+                <table class="data-table" style="margin:0; width:100%; border:1px solid rgba(255,255,255,0.05); border-radius:12px;">
+                    <thead>
+                        <tr>
+                            <th>Network</th>
+                            <th>Avg. Cost (1GB)</th>
+                            <th>Target Sell (Client)</th>
+                            <th>Target Sell (VIP)</th>
+                            <th>Avg. Margin</th>
+                            <th>Rating</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span style="color:#facc15;">🟡 MTN (Ishare)</span></td>
+                            <td>₵2.40</td>
+                            <td>₵3.00</td>
+                            <td>₵2.80</td>
+                            <td>20-25%</td>
+                            <td><span style="color:#10b981;">⭐⭐⭐⭐⭐</span></td>
+                        </tr>
+                        <tr>
+                            <td><span style="color:#3b82f6;">📶 AT (Ishare)</span></td>
+                            <td>₵1.80</td>
+                            <td>₵2.50</td>
+                            <td>₵2.30</td>
+                            <td>30-35%</td>
+                            <td><span style="color:#10b981;">⭐⭐⭐⭐⭐</span></td>
+                        </tr>
+                        <tr>
+                            <td><span style="color:#ef4444;">🔴 Telecel</span></td>
+                            <td>₵2.00</td>
+                            <td>₵2.80</td>
+                            <td>₵2.60</td>
+                            <td>25-30%</td>
+                            <td><span style="color:#fbbf24;">⭐⭐⭐⭐</span></td>
+                        </tr>
+                        <tr>
+                            <td><span style="color:#60a5fa;">⚡ AT Bigtime</span></td>
+                            <td>₵2.15</td>
+                            <td>₵3.50</td>
+                            <td>₵3.20</td>
+                            <td>40-50%</td>
+                            <td><span style="color:#10b981;">⭐⭐⭐⭐⭐</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p style="margin:20px 0 0; font-size:12px; color:var(--text-muted); text-align:center; font-style:italic;">
+                * Target margins are based on current market averages. Adjust your sell prices to stay competitive while maintaining profitability.
+            </p>
+        </div>
+    </div>
+
+    <script src="js/profit-calculator.js"></script>
+</body>
+</html>
